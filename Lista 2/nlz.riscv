@@ -1,0 +1,110 @@
+# Para este exercício você deve ler um número e 
+# contar a quantidade de leading zeros.
+# Imma try it with kind of a binary search-ish
+# Victor Cruz - 211031842
+
+	# Directives for syscalls
+	.eqv SYS_exit, 10
+	.eqv SYS_print_int, 1
+	.eqv SYS_read_int, 5
+	.eqv SYS_print_char, 11
+	
+	# Setting Directives for registers
+	.eqv SYS_call, a7
+	.eqv result, s11
+	.eqv bptr, s10	# Buffer pointer
+	
+	# Macros
+	.macro readInt (%reg)
+		li SYS_call, SYS_read_int
+		ecall
+		mv %reg, a0
+	.end_macro 
+	
+	.macro muli (%dest, %src, %imm)
+		li t6, %imm
+		mul %dest, %src, t6
+	.end_macro		
+	
+	.data 
+buffer:	.word 0
+	
+	.text
+	.globl main
+	
+main:
+	li result, 0	# Setting result = 0
+	readInt s0
+	blez s0, null	# Number is zero, no operations needed
+	
+	la bptr, buffer
+	sw s0, 0(bptr)	# Storing number in a buffer
+	
+	jal count_zeros	# Starting nlz logic	
+	jal print
+	j exit
+	
+null:
+	seqz t0, s0	# t0 = (s0 == 0)
+	muli a0, t0, 32	# a0 = t0 * 32
+	jal print
+	jal exit
+	
+# Returns number of leading 0s in a0
+count_zeros:
+	lhu t0, 2(bptr)
+	beqz t0, upper_half_zero	# Upper part is just 0s
+	addi bptr, bptr, 2		# Increment buffer ptr in 2, so as to get 2 LSBs
+	j check_half
+	
+upper_half_zero:
+	addi result, result, 16
+check_half:
+	lbu t0, 1(bptr)	# Loads upper byte
+	seqz t0, t0	# If t0 == 0, then t1=1 else t1=0
+	muli t1, t0, 8
+	add a1, result, t1	# If upper byte is 0, then add 8 to result
+	li t1, 1
+	sub t0, t1, t0
+	add a0, bptr, t0	# Check lower byte if upper is 0
+	
+	addi sp, sp, -16
+	sw ra, 8(sp)
+	jal check_byte
+	lw ra, 8(sp)
+	addi sp, sp, 16
+	ret
+	
+
+# a0 = Address of byte to be read
+# a1 = Current number of 0s counted	
+# Returns Current 0 count in a0
+check_byte:
+	addi sp, sp, -16	# Allocate space in Stack
+	lbu s0, 0(a0)
+loop:
+	slli t0, s0, 1
+	sh t0, 8(sp)
+	lbu t0, 9(sp)	# Checks if "Carrier bit" is '1'
+	seqz t1, t0
+	add a1, a1, t1
+	lbu s0, 8(sp)
+	beqz t0, loop
+	
+	addi sp, sp, 16	# Resets stack pointer
+	mv a0, a1
+	ret	# bit '1' was found	
+
+# Expects a0 to have the number to be printed	
+print:
+	li SYS_call, SYS_print_int
+	ecall
+	li a0 '\n'
+	li SYS_call, SYS_print_char
+	ecall
+	
+	ret
+	
+exit:
+	li SYS_call, SYS_exit
+	ecall
