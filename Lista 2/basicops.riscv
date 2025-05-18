@@ -1,0 +1,100 @@
+# Esse exercício é sobre basic logical ops
+# Leia uint8_t a, b, c
+# 1. Add and Subtract a and b
+# 2. And, or, and xor ops with a and b
+# 3. Máscara entre c e 31 = m
+# 4. sll a em m bits e srl b em m bits
+# Victor Cruz - 211031842
+
+	# Directives for syscalls
+	.eqv SYS_exit, 10
+	.eqv SYS_print_int, 1
+	.eqv SYS_print_char, 11
+	.eqv SYS_read_int, 5
+	
+	# Setting Directives for registers
+	.eqv SYS_call, a7
+	.eqv aptr, s11
+	.eqv bptr, s10
+	.eqv cptr, s9
+	
+	# macros
+	.macro syscall (%num)
+		li SYS_call, %num
+		ecall
+	.end_macro
+	
+	.macro print_int (%reg)
+		mv a0, %reg
+		syscall SYS_print_int
+		li a0, '\n'
+		syscall SYS_print_char
+	.end_macro
+	
+	.data
+add_ptr: .string "ADD: "
+sub_ptr: .string "SUB: "
+and_ptr: .string "AND: "
+or_ptr:  .string "OR: "
+xor_ptr: .string "XOR: "
+msk_ptr: .string "MASK: "
+sll_ptr: .string "SLL("
+m_ptr:	 .byte
+srl_ptr: .string "SRL("
+lst_ptr: .string "): "
+	
+	.text
+	.globl main
+	
+main:
+	addi sp, sp, -16	# Allocating memory in the stack
+	syscall SYS_read_int
+	addi aptr, sp, 8
+	sb a0, 0(aptr)
+	syscall SYS_read_int
+	addi bptr, aptr, 1
+	sb a0, 0(bptr)
+	syscall SYS_read_int
+	addi cptr, bptr, 1
+	sb a0, 0(cptr)
+	
+soma_sub:
+	lb s0, 0(aptr)
+	lb s1, 0(bptr)
+	add t0, s0, s1	# Soma
+	print_int t0
+	
+	sub t0, s0, s1
+	print_int t0
+	
+logical:
+	and t0, s0, s1
+	print_int t0
+	
+	or t0, s0, s1
+	print_int t0
+	
+	xor t0, s0, s1
+	print_int t0
+	
+mask:
+	lb s2, 0(cptr)
+	andi s3, s2, 31	# s3 = m
+	print_int s3
+	
+shift:
+	sll t0, s0, s3
+	print_int t0	# a shifted to left
+	
+	srl t0, s1, s3
+	print_int t0
+	
+	addi sp, sp, 16	# Resets the stack pointer
+	
+exit:
+	syscall SYS_exit
+	
+	
+	
+	
+	
