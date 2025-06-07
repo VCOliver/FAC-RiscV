@@ -1,0 +1,86 @@
+# Para este exercício você deve ler um número natural 
+# maior que 1 e contar a quantidade de passos necessários 
+# para se alcançar a convergência de acordo com a
+# regra da Conjectura de Collatz:
+#    If the number is even, divide it by two.
+#    If the number is odd, triple it and add one.
+# Victor Cruz - 211031842
+
+# Directives for syscalls
+.eqv SYS_exit, 10
+.eqv SYS_print_int, 1
+.eqv SYS_read_int, 5
+.eqv SYS_print_char, 11
+.eqv SYS_print_str, 4
+
+# Setting Directives for registers
+.eqv sarg0, a0	# First sys call argument
+.eqv sarg1, a1	# Second sys call argument
+.eqv result, s11
+.eqv bptr, s10  # Buffer pointer
+        
+# Macros
+.macro syscall (%sys_number)
+	li a7, %sys_number
+	ecall
+.end_macro
+
+.macro inc (%reg)	# increases value in %reg by 1
+	addi %reg, %reg, 1
+.end_macro 
+
+.macro muli (%reg0, %reg1, %imm)	# Sets %reg0 to the lower 32 bit result of multiplying %reg1 with %imm
+	li t6, %imm
+	mul %reg0, %reg1, t6
+.end_macro 
+
+.data
+
+err_str: .string "entrada invalida.\n"
+
+.text 
+.globl main
+
+main:
+	syscall(SYS_read_int)
+	mv t0, a0
+	li t1, 1
+	ble t0, t1, err
+	
+	mv a0, t0
+	jal collarz
+	syscall(SYS_print_int)
+	
+	j exit
+	
+# input: 	a0: integer
+# ------------------------------
+# output:	a0: integer, number of steps taken
+collarz:
+	mv s0, a0	# s0 = a0
+	mv s1, zero	# s1 = 0
+loop:	
+	inc s1	# s1++ 
+	andi t0, s0, 1
+	beqz t0, even
+odd:
+	muli s0, s0, 3
+	addi s0, s0, 1
+	j loop
+even:
+	srli s0, s0, 1
+	addi t0, s0, -1
+	beqz t0, break
+	j loop
+break:
+	mv sarg0, s1
+	ret	
+	
+err:
+	la sarg0, err_str
+	syscall(SYS_print_str)
+	
+exit:
+	syscall(SYS_exit)
+
+        
