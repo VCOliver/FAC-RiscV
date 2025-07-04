@@ -1,0 +1,80 @@
+# Exercício para converter Base64 para Hex
+# Victor Cruz - 211031842
+
+# Directives for syscalls
+.eqv SYS_exit, 10
+.eqv SYS_print_int, 1
+.eqv SYS_read_int, 5
+.eqv SYS_print_char, 11
+.eqv SYS_print_str, 4
+.eqv SYS_read_str, 8
+.eqv SYS_print_intHex, 34
+
+# Macros
+.macro syscall (%sys_number)
+        li a7, %sys_number
+        ecall
+.end_macro
+
+.macro inc (%reg)       # increases value in %reg by 1
+        addi %reg, %reg, 1
+.end_macro 
+
+.macro muli (%reg0, %reg1, %imm)        # Sets %reg0 to the lower 32 bit result of multiplying %reg1 with %imm
+        li t6, %imm
+        mul %reg0, %reg1, t6
+.end_macro 
+
+.data
+
+base64: .string "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+.align 2
+input_buffer: .space 48
+
+.text
+.globl main
+
+main:
+	la a0, input_buffer
+	li a1, 48
+	syscall(SYS_read_str)	# Reads string from terminal, a0 = buffer address, a1 = max length
+	jal get_len		# Gets the length of the read String
+	
+	syscall(SYS_print_int)
+	
+	j exit_program		# Terminate program
+	
+# Subroutine: Calculates the length of a null-terminated string stored at the address in a0.
+# Inputs:
+#   - a0: Address of the string buffer.
+# Outputs:
+#   - a0: Length of the string (number of characters before the null terminator or \n).
+# Registers used:
+#   - s0: Temporary register to hold the current address being checked.
+#   - s1: Counter to store the length of the string.
+get_len:
+	mv s0, a0	# Get buffer address
+	li s1, 0        # s1 = length of Base64 string	
+	li t2, '\0'	# t2 = '\0' so as to find the end of the string
+get_len_loop:
+	add t0, s0, s1
+	lbu t1, (t0)	# Reads byte from addr
+	beq t1, t2, check_for_new_line	# Checks if t1 == '\0'
+	inc s1
+	j get_len_loop
+	
+check_for_new_line:
+	addi t3, s1, -1
+	add t3, t3, s0
+	lbu t1, (t3)
+	li t2, '\n'
+	bne t1, t2, done
+	addi s1, s1, -1
+done:
+	mv a0, s1
+	ret
+	
+exit_program:
+	syscall(SYS_exit)
+
+
