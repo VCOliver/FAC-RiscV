@@ -9,6 +9,7 @@
 .eqv SYS_print_str, 4
 .eqv SYS_read_str, 8
 .eqv SYS_print_intHex, 34
+.eqv SYS_malloc, 9
 
 # Macros
 .macro syscall (%sys_number)
@@ -35,22 +36,115 @@ input_buffer: .space 48
 .globl main
 
 main:
-	la a0, input_buffer
-	li a1, 48
-	syscall(SYS_read_str)	# Reads string from terminal, a0 = buffer address, a1 = max length
-	jal get_len		# Gets the length of the read String
+	la 	a0, input_buffer
+	li 	a1, 48
+	syscall	(SYS_read_str)	# Reads string from terminal, a0 = buffer address, a1 = max length
+	jal 	get_len		# Gets the length of the read String
+	addi 	sp, sp, -16
+	sw 	a0, 8(sp)	# Saves string length in the stack pointer
 	
-	syscall(SYS_print_int)
+	mv 	a1, a0		# Retrieves string length
+	la	a0, input_buffer
+	jal 	base64_to_byte
 	
 	j exit_program		# Terminate program
 	
+# Subroutine: Transforms the base64 string into an array of bytes with their bit equivalent
+# Input:
+#   - a0: Buffer Address
+#   - a1: Length of the base64 string
+# Output:
+#   - a0: Byte array address
+# Registers used:
+#   - s0
+#   - s1
+#   - s2
+base64_to_byte:
+	mv	s0, a0		# s0 = buf_ptr
+	mv	s1, a1		# s1 = base64 string length
+	addi	sp, sp, -8
+	sw	s0, (sp)	# Saves s0 in the stack
+	sw	ra, 4(sp)	# Saves return addr in the stack
+	jal	check_padding	# Calls check_padding function
+	lw	s0, (sp)	# Retrives s0
+	lw	ra, 4(sp)	# Retrieves return addr		
+	addi	sp, sp, 8
+	
+	mv 	t0, a0		# t0 = padding
+	srli  	t1, s1, 2	# s0 = s1 >> 2, aka length/4
+	muli	t1, t1, 3	# s0 *= 3
+	sub	s2, t1, t0	# byte_array_len = t1 - t0
+	mv 	a0, s2		
+	syscall	(SYS_malloc)	# Allocates space in the heap for the output array
+	mv	s3, a0		# arr_ptr = a0
+	mv	a0, s1
+	syscall	(SYS_malloc)	# Allocates space for the base64 'index' array
+	mv	s4, a0		# index_ptr
+	
+	li	s5, 0		# int i = 0
+	addi	sp, sp, -4
+	sw	ra, (sp)
+b64toi_loop:
+	add	a0, s0, s5	# a0 = buf_ptr + i
+	jal	search_base64_index	
+	add	t1, s4, s5	# t1 = index_ptr + i
+	sw	a0, (t1)	# *t1 = a0
+	inc	s5		# i++
+	bne	s5, s1, b64toi_loop
+	
+	lw	ra, (sp)
+	addi	sp, sp, 4
+	ret
+
+# Subroutine: Gets the index of the Base64 letter
+# Input:
+#   - a0: byte ptr
+# Output:
+#   - a0: index
+# Registers used:
+#   - None
+search_base64_index:
+	mv	t1, a0		# uint8_t *t1 = byte_ptr
+	li	t0, 0		# int i = 0
+	li	t2, '='		# To check for paddings
+	li	a0, 0		# a0 = return value
+	lw	t3, (t1)	# t3 = *t1
+	beq	t3, t2, sb64i_done
+sb64i_loop:
+	
+sb64i_done:
+	ret
+	
+# Subroutine: Checks for '=' padding on the input base64 string
+# Input:
+#   - a0: Buffer Address
+#   - a1: Length of the string
+# Output:
+#   - a0: Padding length
+# Registers used:
+#   - s0: Register that holds result locally
+check_padding:
+	li s0, 0
+	mv	t0, a1		# t0 = length
+	addi	t0, t0, -1	# t0 -= 1
+	add	t1, a0, t0	# t1 = addr + t0
+	lb	t2, (t1)	# t2 = buf[len-1]
+cp:				# Checks if value == '='
+	li	t3, '='
+	bne	t2, t3, cp_done
+	inc	s0		# padding++
+	j cp
+cp_done:
+	mv a0, s0		# a0 = padding
+	ret
+
 # Subroutine: Calculates the length of a null-terminated string stored at the address in a0.
 # Inputs:
 #   - a0: Address of the string buffer.
 # Outputs:
 #   - a0: Length of the string (number of characters before the null terminator or \n).
 # Registers used:
-#   - s0: Temporary register to hold the current address being checked.
+#   - s0: Register to hold the current address being checked.
 #   - s1: Counter to store the length of the string.
 get_len:
 	mv s0, a0	# Get buffer address
@@ -68,9 +162,9 @@ check_for_new_line:
 	add t3, t3, s0
 	lbu t1, (t3)
 	li t2, '\n'
-	bne t1, t2, done
+	bne t1, t2, cfnl_done	# Does not count '\n' for scring length
 	addi s1, s1, -1
-done:
+cfnl_done:
 	mv a0, s1
 	ret
 	

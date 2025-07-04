@@ -53,12 +53,11 @@ typedef union {
 } uint24_t;
 
 uint8_t *base64_to_byte(const char* buf, int len){
-    // Calculate padding
     int padding = 0;
     if (len >= 2 && buf[len-1] == '=') padding++;
     if (len >= 1 && buf[len-2] == '=') padding++;
-    
     int output_len = (len / 4) * 3 - padding;
+    
     uint8_t *bytes = (uint8_t*)malloc(output_len);
     uint8_t *index = (uint8_t*)malloc(len);
     
