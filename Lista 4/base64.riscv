@@ -104,13 +104,19 @@ b64toi_loop:
 # Registers used:
 #   - None
 search_base64_index:
-	mv	t1, a0		# uint8_t *t1 = byte_ptr
-	li	t0, 0		# int i = 0
+	lbu	t1, (a0)	# uint8_t t1 = *byte_ptr
 	li	t2, '='		# To check for paddings
-	li	a0, 0		# a0 = return value
-	lw	t3, (t1)	# t3 = *t1
+	li	a0, 0		# a0 = return value; int i = 0
+	la	t0, base64	# uint8_t *t0 = base64_ptr
+	lbu	t3, (t0)	# t3 = *t0
 	beq	t3, t2, sb64i_done
 sb64i_loop:
+	lbu	t3, (t0)
+	beq	t1, t3, sb64i_done
+	inc	t0		# t0++
+	inc 	a0		# i++
+	addi	t4, a0, -64	# t4 = i - 64
+	blt  	t4, zero, sb64i_loop
 	
 sb64i_done:
 	ret
