@@ -65,6 +65,7 @@ uint8_t *base64_to_byte(const char* buf, int len){
         index[i] = search_base64_index(buf[i]);
     }
     
+    
     for (int i=0; i<len; i+=4){
         uint24_t temp;
         // Correct bit arrangement for base64 decoding
